@@ -2,18 +2,29 @@ import numpy as np
 from scipy import optimize
 
 def column_stress_error(P, L, E, A, r, c, e, sigma_allow):
-    # מניעת ערכים שליליים בתוך השורש בזמן החיפוש של ניוטון
+    # אם העומס הוא 0 או שלילי, המאמץ הוא 0 ולכן השגיאה היא מינוס המותר
     if P <= 0:
         return -sigma_allow
         
-    # נוסחת הסקנט המתוקנת עם סוגריים תקינים #
-    sec_term = 1 / np.cos(((L / (2 * r)) * np.sqrt(P / (E * A))))
+    # חישוב הביטוי שבתוך הקוסינוס
+    cos_argument = (L / (2 * r)) * np.sqrt(P / (E * A))
+    
+    # הגנה מתמטית: אם הקוסינוס מתקרב לאפס או שלילי (עברנו את נקודת הקריסה התיאורטית)
+    if cos_argument >= np.pi / 2:
+        return float('inf') # מחזיר אינסוף כדי לסמן לרובוט לחזור אחורה
+        
+    sec_term = 1 / np.cos(cos_argument)
     sigma_max = (P / A) * (1 + (e * c / r**2) * sec_term)
     return sigma_max - sigma_allow
 
 def find_critical_load(L, E, A, r, c, e, sigma_allow):
-    # ניחוש ראשוני יציב של 1000.0 מונע Overflow
-    P_critical = optimize.newton(lambda P: column_stress_error(P, L, E, A, r, c, e, sigma_allow), 1000.0)
+    # שימוש ב-brentq בטווח בטוח בין 0 לעומס עצום (למשל A * sigma_allow)
+    # השיטה הזו חסינה לקריסות ומובטח שתמצא את התשובה
+    P_critical = optimize.brentq(
+        lambda P: column_stress_error(P, L, E, A, r, c, e, sigma_allow),
+        0.0, 
+        float(A * sigma_allow)
+    )
     return P_critical
 
 if __name__ == "__main__":
