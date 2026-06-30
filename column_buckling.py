@@ -1,20 +1,32 @@
-import numpy as np
-from scipy import optimize
+def find_critical_load(L, E, A, r, c, e, sigma_allow):
+    """
+    L: אורך במ"מ
+    E: מודול אלסטיות ב-MPa
+    A: שטח חתך בממ"ר
+    r: רדיוס אינרציה במ"מ
+    c: מרחק לסיב קיצוני במ"מ
+    e: אקסצנטריות במ"מ
+    sigma_allow: מאמץ מותר ב-MPa
 
-def column_stress_error(P, L, E, A, r, c, e, sigma_allow):
-    # פרמטרים לדוגמה #
-    #A, E, L, r, e, c = 5000, 200000, 3000, 50, 20, 100
-    # נוסחת הסקנט #
-    sec_term = 1 / np.cos((L / (2 * r)) * np.sqrt(P / (E * A)))
-    sigma_max = (P / A) * (1 + (e * c / r**2) * sec_term)
-    return sigma_max - sigma_allow
+    Return: העומס P בניוטון (float)
+    """
+    # כתבו כאן את הקוד
+import numpy as np
+from scipy.optimize import bisect
 
 def find_critical_load(L, E, A, r, c, e, sigma_allow):
-    # חישוב עומס אוילר התיאורטי כגבול עליון לקריסה
-    P_euler = (np.pi**2 * E * (A * r**2)) / L**2
+    def f(P):
+        if P <= 0:
+            return -sigma_allow
+        
+        angle = (L / (2 * r)) * np.sqrt(P / (E * A))
+        
+        # sec(x) = 1 / cos(x)
+        sigma_max = (P / A) * (1 + (e * c / (r**2)) * (1 / np.cos(angle)))
+        
+        return sigma_max - sigma_allow
+
+    # חסם עליון מבוסס על עומס אוילר התיאורטי
+    p_euler = (np.pi**2 * E * (A * r**2)) / (L**2)
     
-    # ניחוש ראשוני בטוח - 40% מעומס אוילר (מתאים לכל קנה מידה של עמוד)
-    guess = P_euler * 0.4
-    
-    P_critical = optimize.newton(lambda P: column_stress_error(P, L, E, A, r, c, e, sigma_allow), guess)
-    return P_critical
+    return float(bisect(f, 0.01, p_euler * 0.99, xtol=1e-4))
